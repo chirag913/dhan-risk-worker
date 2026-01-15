@@ -1,7 +1,7 @@
 import getSupabase from "./supabase.js"
 import decrypt from "./crypto.js"
 import activateDhanKillSwitch from "./dhan.js"
-import { isMarketOpenIST } from "./marketTime.js"
+import isMarketOpenIST from "./marketTime.js"
 
 console.log("🚀 DHAN Risk Worker started")
 
