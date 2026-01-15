@@ -1,4 +1,4 @@
-import { supabase } from "./supabase.js"
+import { getSupabase } from "./supabase.js"
 import { decrypt } from "./crypto.js"
 import { activateDhanKillSwitch } from "./dhan.js"
 import { isMarketOpenIST } from "./marketTime.js"
@@ -6,6 +6,7 @@ import { isMarketOpenIST } from "./marketTime.js"
 console.log("🚀 DHAN Risk Worker started")
 
 while (true) {
+  
   try {
     if (!isMarketOpenIST()) {
       console.log("⏸ Market closed, sleeping...")
@@ -14,7 +15,7 @@ while (true) {
     }
 
     console.log("📊 Market open, checking users...")
-
+const supabase = getSupabase()
     const { data: users, error } = await supabase
       .from("trading_configs")
       .select(`
@@ -46,8 +47,10 @@ while (true) {
           console.log("🔥 Kill switch triggered for", user.user_id)
 
           // HARD STATE FIRST
-          await supabase
-            .from("trading_configs")
+    const supabase = getSupabase()
+
+const { data: users, error } = await supabase
+  .from("trading_configs")
             .update({
               kill_switch_active: true,
               kill_triggered_at: new Date().toISOString()
