@@ -1,5 +1,12 @@
 import fetch from "node-fetch"
 
+// Only executed orders count
+const COMPLETED_STATUSES = new Set([
+  "COMPLETE",
+  "TRADED",
+  "EXECUTED"
+])
+
 function isTodayIST(dateStr) {
   const orderDate = new Date(dateStr)
 
@@ -14,14 +21,7 @@ function isTodayIST(dateStr) {
   )
 }
 
-// statuses that mean an order actually executed
-const COMPLETED_STATUSES = new Set([
-  "COMPLETE",
-  "TRADED",
-  "EXECUTED"
-])
-
-export default async function fetchTodayOrderCount(token) {
+export default async function fetchTodayCompletedOrderCount(token) {
   const res = await fetch("https://api.dhan.co/v2/orders", {
     headers: {
       "access-token": token
