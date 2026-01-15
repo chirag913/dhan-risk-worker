@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabase.js"
+import getSupabase from "./supabase.js"
 import decrypt from "./crypto.js"
 import activateDhanKillSwitch from "./dhan.js"
 import { isMarketOpenIST } from "./marketTime.js"
