@@ -2,6 +2,7 @@ import getSupabase from "./supabase.js"
 import decrypt from "./crypto.js"
 import activateDhanKillSwitch from "./dhan.js"
 import isMarketOpenIST from "./marketTime.js"
+import fetchDhanPnL from "./dhanPositions.js"
 
 console.log("🚀 DHAN Risk Worker started")
 
@@ -34,11 +35,17 @@ const supabase = getSupabase()
         const token = decrypt(user.encrypted_token)
 
         // ⛔ PLACEHOLDER — we add real logic next
-        const pnl = 0
+const pnl = await fetchDhanPnL(token)
+
+console.log(
+  `PnL for ${user.user_id}:`,
+  pnl.total,
+  `(Realised: ${pnl.realised}, Unrealised: ${pnl.unrealised})`
+)
         const orderCount = 0
 
         const lossBreached =
-          user.max_loss !== null && pnl <= -user.max_loss
+  user.max_loss !== null && pnl.total <= -user.max_loss
 
         const ordersBreached =
           user.max_orders !== null && orderCount >= user.max_orders
