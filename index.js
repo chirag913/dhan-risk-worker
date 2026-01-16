@@ -50,6 +50,7 @@ while (true) {
         /* =========================
            FETCH REAL P&L FROM DHAN
            ========================= */
+           console.log("🔑 Using DHAN token (first 6 chars):", token.slice(0, 6))
         const pnl = await fetchDhanPnL(token)
 
         console.log(

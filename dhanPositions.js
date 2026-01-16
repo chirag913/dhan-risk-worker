@@ -1,30 +1,41 @@
 import fetch from "node-fetch"
 
 export default async function fetchDhanPnL(token) {
-  const res = await fetch("https://api.dhan.co/v2/positions", {
-    headers: {
-      "access-token": token
-    }
-  })
+  try {
+    const res = await fetch("https://api.dhan.co/v2/positions", {
+      method: "GET",
+      headers: {
+        "access-token": token,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      timeout: 10000 // 10s safety
+    })
 
-  if (!res.ok) {
     const text = await res.text()
-    throw new Error("Failed to fetch positions: " + text)
-  }
 
-  const data = await res.json()
+    if (!res.ok) {
+      throw new Error(
+        `DHAN positions failed (${res.status}): ${text}`
+      )
+    }
 
-  let realised = 0
-  let unrealised = 0
+    const data = JSON.parse(text)
 
-  for (const pos of data || []) {
-    realised += Number(pos.realisedProfit || 0)
-    unrealised += Number(pos.unrealisedProfit || 0)
-  }
+    let realised = 0
+    let unrealised = 0
 
-  return {
-    realised,
-    unrealised,
-    total: realised + unrealised
+    for (const pos of data || []) {
+      realised += Number(pos.realisedProfit || 0)
+      unrealised += Number(pos.unrealisedProfit || 0)
+    }
+
+    return {
+      realised,
+      unrealised,
+      total: realised + unrealised
+    }
+  } catch (err) {
+    throw new Error("DHAN PnL fetch error: " + err.message)
   }
 }
