@@ -1,6 +1,6 @@
 import fetch from "node-fetch"
 
-// Only orders that actually executed
+// DHAN considers only these as actually traded orders
 const COMPLETED_STATUSES = new Set([
   "COMPLETE",
   "TRADED",
@@ -11,7 +11,9 @@ function isTodayIST(dateStr) {
   const orderDate = new Date(dateStr)
 
   const nowIST = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+    new Date().toLocaleString("en-US", {
+      timeZone: "Asia/Kolkata"
+    })
   )
 
   return (
@@ -29,9 +31,12 @@ export default async function fetchTodayCompletedOrderCount(token) {
         "access-token": token,
         "client-id": process.env.DHAN_CLIENT_ID,
         "Accept": "application/json",
-        "Content-Type": "application/json"
-      },
-      timeout: 10000
+        "Content-Type": "application/json",
+
+        // 🔥 REQUIRED — prevents DHAN from killing server requests
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+      }
     })
 
     const text = await res.text()
@@ -58,6 +63,8 @@ export default async function fetchTodayCompletedOrderCount(token) {
 
     return count
   } catch (err) {
-    throw new Error("DHAN order count fetch error: " + err.message)
+    throw new Error(
+      "DHAN order count fetch error: " + err.message
+    )
   }
 }

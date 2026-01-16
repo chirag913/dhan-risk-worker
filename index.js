@@ -9,15 +9,15 @@ if (!DHAN_TOKEN) {
   throw new Error("DHAN_ACCESS_TOKEN is missing")
 }
 
-console.log("🚀 DHAN Risk Worker started (PERSONAL MODE)")
+console.log("🚀 DHAN Risk Worker started (PERSONAL MODE – FAST)")
 
 // 🔧 PERSONAL LIMITS
 const MAX_LOSS = 5      // ₹ (positive number)
 const MAX_ORDERS = 1    // completed trades
 
-// ⏱️ SAFE INTERVALS (DHAN-friendly)
-const POLL_INTERVAL_MS = 30000   // 30 seconds
-const ERROR_BACKOFF_MS = 60000   // 1 minute
+// ⚡ FAST INTERVALS
+const POLL_INTERVAL_MS = 3000   // 3 seconds
+const ERROR_RETRY_MS   = 2000   // 2 seconds
 
 while (true) {
   try {
@@ -60,11 +60,10 @@ while (true) {
     /* =========================
        BREACH CHECKS
        ========================= */
-    const lossBreached = pnl.total <= -MAX_LOSS
+    const lossBreached   = pnl.total <= -MAX_LOSS
     const ordersBreached = orderCount >= MAX_ORDERS
 
     if (!lossBreached && !ordersBreached) {
-      // ✅ No breach → wait safely
       await sleep(POLL_INTERVAL_MS)
       continue
     }
@@ -86,8 +85,8 @@ while (true) {
   } catch (e) {
     console.error("Worker error:", e.message)
 
-    // 🛡️ Backoff on DHAN/network errors
-    await sleep(ERROR_BACKOFF_MS)
+    // ⚡ short retry — no long backoff
+    await sleep(ERROR_RETRY_MS)
   }
 }
 

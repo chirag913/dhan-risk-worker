@@ -8,9 +8,11 @@ export default async function fetchDhanPnL(token) {
         "access-token": token,
         "client-id": process.env.DHAN_CLIENT_ID,
         "Accept": "application/json",
-        "Content-Type": "application/json"
-      },
-      timeout: 10000
+        "Content-Type": "application/json",
+        // 🔥 THIS IS THE FIX
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+      }
     })
 
     const text = await res.text()
