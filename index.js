@@ -11,9 +11,13 @@ if (!DHAN_TOKEN) {
 
 console.log("🚀 DHAN Risk Worker started (PERSONAL MODE)")
 
-// 🔧 PERSONAL LIMITS (change anytime)
-const MAX_LOSS = 5        // ₹
-const MAX_ORDERS = 1        // completed trades
+// 🔧 PERSONAL LIMITS
+const MAX_LOSS = 5      // ₹ (positive number)
+const MAX_ORDERS = 1    // completed trades
+
+// ⏱️ SAFE INTERVALS (DHAN-friendly)
+const POLL_INTERVAL_MS = 30000   // 30 seconds
+const ERROR_BACKOFF_MS = 60000   // 1 minute
 
 while (true) {
   try {
@@ -60,7 +64,8 @@ while (true) {
     const ordersBreached = orderCount >= MAX_ORDERS
 
     if (!lossBreached && !ordersBreached) {
-      await sleep(5000)
+      // ✅ No breach → wait safely
+      await sleep(POLL_INTERVAL_MS)
       continue
     }
 
@@ -75,15 +80,20 @@ while (true) {
     await activateDhanKillSwitch(DHAN_TOKEN)
 
     console.log("🛑 Kill switch locked for the day")
-    break // stop worker after kill (personal safety)
+
+    break // ⛔ stop worker after kill (personal safety)
 
   } catch (e) {
     console.error("Worker error:", e.message)
-  }
 
-  await sleep(5000)
+    // 🛡️ Backoff on DHAN/network errors
+    await sleep(ERROR_BACKOFF_MS)
+  }
 }
 
+/* =========================
+   UTILITY
+   ========================= */
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
