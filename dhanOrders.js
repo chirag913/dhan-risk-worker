@@ -1,6 +1,6 @@
 import fetch from "node-fetch"
 
-// Only executed orders count
+// Only orders that actually executed
 const COMPLETED_STATUSES = new Set([
   "COMPLETE",
   "TRADED",
@@ -10,42 +10,54 @@ const COMPLETED_STATUSES = new Set([
 function isTodayIST(dateStr) {
   const orderDate = new Date(dateStr)
 
-  const now = new Date(
+  const nowIST = new Date(
     new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
   )
 
   return (
-    orderDate.getDate() === now.getDate() &&
-    orderDate.getMonth() === now.getMonth() &&
-    orderDate.getFullYear() === now.getFullYear()
+    orderDate.getDate() === nowIST.getDate() &&
+    orderDate.getMonth() === nowIST.getMonth() &&
+    orderDate.getFullYear() === nowIST.getFullYear()
   )
 }
 
 export default async function fetchTodayCompletedOrderCount(token) {
-  const res = await fetch("https://api.dhan.co/v2/orders", {
-    headers: {
-      "access-token": token
-    }
-  })
+  try {
+    const res = await fetch("https://api.dhan.co/v2/orders", {
+      method: "GET",
+      headers: {
+        "access-token": token,
+        "client-id": process.env.DHAN_CLIENT_ID,
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      timeout: 10000
+    })
 
-  if (!res.ok) {
     const text = await res.text()
-    throw new Error("Failed to fetch orders: " + text)
-  }
 
-  const orders = await res.json()
-
-  let count = 0
-
-  for (const order of orders || []) {
-    if (
-      order.orderTime &&
-      isTodayIST(order.orderTime) &&
-      COMPLETED_STATUSES.has(order.orderStatus)
-    ) {
-      count++
+    if (!res.ok) {
+      throw new Error(
+        `DHAN orders failed (${res.status}): ${text}`
+      )
     }
-  }
 
-  return count
+    const orders = JSON.parse(text)
+
+    let count = 0
+
+    for (const order of orders || []) {
+      if (
+        order.orderTime &&
+        isTodayIST(order.orderTime) &&
+        COMPLETED_STATUSES.has(order.orderStatus)
+      ) {
+        count++
+      }
+    }
+
+    return count
+  } catch (err) {
+    throw new Error("DHAN order count fetch error: " + err.message)
+  }
 }

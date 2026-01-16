@@ -6,10 +6,11 @@ export default async function fetchDhanPnL(token) {
       method: "GET",
       headers: {
         "access-token": token,
-        "Content-Type": "application/json",
-        "Accept": "application/json"
+        "client-id": process.env.DHAN_CLIENT_ID,
+        "Accept": "application/json",
+        "Content-Type": "application/json"
       },
-      timeout: 10000 // 10s safety
+      timeout: 10000
     })
 
     const text = await res.text()

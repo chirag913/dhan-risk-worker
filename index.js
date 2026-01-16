@@ -1,10 +1,19 @@
-import getSupabase from "./supabase.js"
 import activateDhanKillSwitch from "./dhan.js"
 import isMarketOpenIST from "./marketTime.js"
 import fetchDhanPnL from "./dhanPositions.js"
 import fetchTodayCompletedOrderCount from "./dhanOrders.js"
 
-console.log("🚀 DHAN Risk Worker started")
+const DHAN_TOKEN = process.env.DHAN_ACCESS_TOKEN
+
+if (!DHAN_TOKEN) {
+  throw new Error("DHAN_ACCESS_TOKEN is missing")
+}
+
+console.log("🚀 DHAN Risk Worker started (PERSONAL MODE)")
+
+// 🔧 PERSONAL LIMITS (change anytime)
+const MAX_LOSS = 5        // ₹
+const MAX_ORDERS = 1        // completed trades
 
 while (true) {
   try {
@@ -13,139 +22,68 @@ while (true) {
        ========================= */
     if (!isMarketOpenIST()) {
       console.log("⏸ Market closed, sleeping...")
-      await sleep(60000) // 1 minute
+      await sleep(60000)
       continue
     }
 
-    console.log("📊 Market open, checking users...")
+    console.log("📊 Market open, checking risk...")
 
-    const supabase = getSupabase()
-
-    /* =========================
-       FETCH ACTIVE USERS
-       ========================= */
-    const { data: users, error } = await supabase
-      .from("trading_configs")
-      .select(`
-        user_id,
-        max_loss,
-        max_orders,
-        kill_switch_active,
-        api_key
-      `)
-      .eq("kill_switch_active", false)
-      .not("api_key", "is", null)
-      .neq("api_key", "")
-
-    if (error) throw error
+    console.log(
+      "🔑 Using DHAN token (first 6 chars):",
+      DHAN_TOKEN.slice(0, 6)
+    )
 
     /* =========================
-       PROCESS EACH USER
+       FETCH REAL P&L
        ========================= */
-    for (const user of users || []) {
-      try {
-        const token = user.api_key
+    const pnl = await fetchDhanPnL(DHAN_TOKEN)
 
-        /* =========================
-           TOKEN SAFETY GUARD
-           ========================= */
-        if (!token || token.trim().length < 10) {
-          console.log(`⚠️ Skipping user ${user.user_id}: invalid api_key`)
-          continue
-        }
+    console.log(
+      `PnL: ${pnl.total} (R: ${pnl.realised}, U: ${pnl.unrealised})`
+    )
 
-        console.log(
-          "🔑 Using DHAN token (first 6 chars):",
-          token.slice(0, 6)
-        )
+    /* =========================
+       FETCH COMPLETED ORDERS
+       ========================= */
+    const orderCount =
+      await fetchTodayCompletedOrderCount(DHAN_TOKEN)
 
-        /* =========================
-           FETCH REAL P&L
-           ========================= */
-        const pnl = await fetchDhanPnL(token)
+    console.log(
+      `Completed orders today:`,
+      orderCount
+    )
 
-        console.log(
-          `PnL for ${user.user_id}: ${pnl.total} (R: ${pnl.realised}, U: ${pnl.unrealised})`
-        )
+    /* =========================
+       BREACH CHECKS
+       ========================= */
+    const lossBreached = pnl.total <= -MAX_LOSS
+    const ordersBreached = orderCount >= MAX_ORDERS
 
-        /* =========================
-           FETCH COMPLETED ORDERS
-           ========================= */
-        const orderCount = await fetchTodayCompletedOrderCount(token)
-
-        console.log(
-          `Completed orders today for ${user.user_id}:`,
-          orderCount
-        )
-
-        /* =========================
-           BREACH CHECKS
-           ========================= */
-        const lossBreached =
-          user.max_loss !== null && pnl.total <= -user.max_loss
-
-        const ordersBreached =
-          user.max_orders !== null && orderCount >= user.max_orders
-
-        if (!lossBreached && !ordersBreached) continue
-
-        const killReason = lossBreached ? "MAX_LOSS" : "MAX_ORDERS"
-
-        console.log(
-          `🔥 Kill switch triggered for ${user.user_id} | Reason: ${killReason}`
-        )
-
-        /* =========================
-           1️⃣ AUDIT LOG (IMMUTABLE)
-           ========================= */
-        await supabase
-          .from("kill_switch_audit_logs")
-          .insert({
-            user_id: user.user_id,
-            kill_reason: killReason,
-
-            max_loss: user.max_loss,
-            max_orders: user.max_orders,
-
-            realised_pnl: pnl.realised,
-            unrealised_pnl: pnl.unrealised,
-            total_pnl: pnl.total,
-
-            order_count: orderCount,
-
-            dhan_kill_attempted: true
-          })
-
-        /* =========================
-           2️⃣ HARD STATE UPDATE
-           ========================= */
-        await supabase
-          .from("trading_configs")
-          .update({
-            kill_switch_active: true,
-            kill_triggered_at: new Date().toISOString()
-          })
-          .eq("user_id", user.user_id)
-
-        /* =========================
-           3️⃣ BROKER ENFORCEMENT
-           ACTIVATE → DEACTIVATE → ACTIVATE
-           ========================= */
-        await activateDhanKillSwitch(token)
-      } catch (e) {
-        console.error("User error:", e.message)
-      }
+    if (!lossBreached && !ordersBreached) {
+      await sleep(5000)
+      continue
     }
+
+    const reason = lossBreached ? "MAX_LOSS" : "MAX_ORDERS"
+
+    console.log(`🔥 KILL SWITCH TRIGGERED | Reason: ${reason}`)
+
+    /* =========================
+       BROKER ENFORCEMENT
+       ACTIVATE → DEACTIVATE → ACTIVATE
+       ========================= */
+    await activateDhanKillSwitch(DHAN_TOKEN)
+
+    console.log("🛑 Kill switch locked for the day")
+    break // stop worker after kill (personal safety)
+
   } catch (e) {
     console.error("Worker error:", e.message)
   }
 
-  await sleep(5000) // poll every 5 seconds
+  await sleep(5000)
 }
 
-/* =========================
-   UTILITY
-   ========================= */
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
