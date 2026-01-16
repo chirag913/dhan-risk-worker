@@ -30,12 +30,12 @@ while (true) {
     const { data: users, error } = await supabase
       .from("trading_configs")
       .select(`
-        user_id,
-        max_loss,
-        max_orders,
-        kill_switch_active,
-        encrypted_token
-      `)
+  user_id,
+  max_loss,
+  max_orders,
+  kill_switch_active,
+  api_key
+`)
       .eq("kill_switch_active", false)
 
     if (error) throw error
@@ -45,7 +45,8 @@ while (true) {
        ========================= */
     for (const user of users || []) {
       try {
-        const token = decrypt(user.encrypted_token)
+        const token = decrypt(user.api_key)
+
 
         /* =========================
            FETCH REAL P&L FROM DHAN
