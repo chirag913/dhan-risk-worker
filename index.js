@@ -4,8 +4,6 @@ import isMarketOpenIST from "./marketTime.js"
 import fetchDhanPnL from "./dhanPositions.js"
 import fetchTodayCompletedOrderCount from "./dhanOrders.js"
 
-// import fetchTodayOrderCount from "./dhanOrders.js" // enable when ready
-
 console.log("🚀 DHAN Risk Worker started")
 
 while (true) {
@@ -15,7 +13,7 @@ while (true) {
        ========================= */
     if (!isMarketOpenIST()) {
       console.log("⏸ Market closed, sleeping...")
-      await sleep(60000)
+      await sleep(60000) // 1 minute
       continue
     }
 
@@ -29,13 +27,15 @@ while (true) {
     const { data: users, error } = await supabase
       .from("trading_configs")
       .select(`
-  user_id,
-  max_loss,
-  max_orders,
-  kill_switch_active,
-  api_key
-`)
+        user_id,
+        max_loss,
+        max_orders,
+        kill_switch_active,
+        api_key
+      `)
       .eq("kill_switch_active", false)
+      .not("api_key", "is", null)
+      .neq("api_key", "")
 
     if (error) throw error
 
@@ -46,23 +46,38 @@ while (true) {
       try {
         const token = user.api_key
 
+        /* =========================
+           TOKEN SAFETY GUARD
+           ========================= */
+        if (!token || token.trim().length < 10) {
+          console.log(`⚠️ Skipping user ${user.user_id}: invalid api_key`)
+          continue
+        }
+
+        console.log(
+          "🔑 Using DHAN token (first 6 chars):",
+          token.slice(0, 6)
+        )
 
         /* =========================
-           FETCH REAL P&L FROM DHAN
+           FETCH REAL P&L
            ========================= */
-           console.log("🔑 Using DHAN token (first 6 chars):", token.slice(0, 6))
         const pnl = await fetchDhanPnL(token)
 
         console.log(
           `PnL for ${user.user_id}: ${pnl.total} (R: ${pnl.realised}, U: ${pnl.unrealised})`
         )
 
-      const orderCount = await fetchTodayCompletedOrderCount(token)
+        /* =========================
+           FETCH COMPLETED ORDERS
+           ========================= */
+        const orderCount = await fetchTodayCompletedOrderCount(token)
 
-console.log(
-  `Completed orders today for ${user.user_id}:`,
-  orderCount
-)
+        console.log(
+          `Completed orders today for ${user.user_id}:`,
+          orderCount
+        )
+
         /* =========================
            BREACH CHECKS
            ========================= */
@@ -128,6 +143,9 @@ console.log(
   await sleep(5000) // poll every 5 seconds
 }
 
+/* =========================
+   UTILITY
+   ========================= */
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
